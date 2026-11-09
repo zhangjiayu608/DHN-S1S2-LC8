@@ -1,0 +1,543 @@
+# One configuration for all 18 models and both annotation budgets.
+paths:
+  data_root: data/S1S2_LC8_Robust
+  assets_root: assets
+  output_root: outputs
+shared:
+  implementation_version: dagpid-20261014
+  data:
+    dataset: s1s2_lc8_tiff
+    batch_size: 64
+    val_batch_size: 64
+    num_workers: 10
+    persistent_workers: true
+    prefetch_factor: 3
+    pin_memory: true
+    drop_last: true
+    filter_missing_files: false
+    augment: true
+  model:
+    scan_backend: mamba
+    num_classes: 8
+    adapter_rank: 64
+    decoder_channels: 192
+    freeze_backbone: true
+    reliability_hidden: 192
+    graph_context_dim: 32
+    uncertainty_gamma: 1.0
+    external_priors:
+      local_stem: true
+      dagpid_fusion:
+        integral_gain: 0.35
+        derivative_gain: 0.78
+        cluster_ssm:
+          ssm_dim: 192
+          cluster_hw: 4
+          temperature: 0.08
+          depth: 1
+        gate_warmup_start_epoch: 1
+        gate_warmup_epochs: 10
+        initial_gate_bias:
+          sar: 0.0
+          optical: 0.0
+          joint: 0.45
+          dinov3: -1.1
+          local: -0.55
+          cf_sar: -0.75
+          cf_optical: -0.75
+        final_gate_bias:
+          sar: 0.0
+          optical: 0.0
+          joint: 0.05
+          dinov3: 0.0
+          local: 0.08
+          cf_sar: 0.02
+          cf_optical: 0.02
+        graph_alpha_init: 0.04
+        graph_risk_beta_init: 0.08
+        graph_gate_scale_init: 0.18
+        feature_graph:
+          nodes:
+          - sar
+          - optical
+          - joint
+          - dinov3
+          - local
+          - cf_sar
+          - cf_optical
+          - conflict
+          - boundary
+          topology:
+          - sar
+          - optical
+          - dinov3
+          - local
+          - cf_sar
+          - cf_optical
+          - joint
+          - conflict
+          - boundary
+          state_dim: 96
+          delta_rank: 32
+          init_logit: -4.5
+          prior_logit: 1.6
+          delta_scale: 0.12
+          integral_bottleneck_dim: 192
+      boundary_decoder:
+        risk_dim: 96
+        risk_downsample: 4
+      local_tokens:
+        enabled: true
+        encoder: vss_lite
+        in_channels: 14
+        stem_dim: 96
+        vss_dim: 192
+        depth: 2
+        patch_size: 8
+        ssm_inner_dim: 192
+      dinov3:
+        enabled: true
+        model_dir: ${ASSETS_ROOT}/third_party/dinov3-vitl16-pretrain-sat493m
+        repo_dir: ${ASSETS_ROOT}/third_party/dinov3-main
+        input_size: 224
+        rgb_indices:
+        - 3
+        - 2
+        - 1
+        out_dim: 768
+        freeze: true
+        use_checkpoint: false
+        spectral_residual_scale: 0.0
+        train_spectral_residual: false
+      complementary:
+        enabled: true
+        hidden_dim: 384
+        scale_init: 0.45
+    croma_input_norm: false
+  loss:
+    ignore_index: 255
+    class_weights: null
+    complementary_weight: 0.02
+    graph_prior_weight: 0.0003
+    graph_sparsity_weight: 1.0e-05
+    schedule:
+      complementary_start_epoch: 1
+      complementary_ramp_epochs: 6
+      graph_prior_start_epoch: 3
+      graph_prior_ramp_epochs: 8
+      graph_sparsity_start_epoch: 3
+      graph_sparsity_ramp_epochs: 8
+  optimizer:
+    no_decay_weight_decay: 0.0
+    lr: 7.5e-05
+    weight_decay: 0.05
+  scheduler:
+    name: warmup_cosine
+    warmup_epochs: 5
+    min_lr_ratio: 0.02
+  train:
+    epochs: 100
+    amp: bf16
+    grad_clip: 1.0
+    grad_accum_steps: 1
+    cutmix_alpha: 1.0
+    early_stopping_patience: 0
+    early_stopping_min_delta: 0.0
+    progress_interval: 50
+    progress_train_metrics: true
+    find_unused_parameters: true
+    cutmix_prob: 0.03
+    class_weighting: inverse_sqrt
+    checkpoint_selection: best
+    validation_boundary: false
+labels:
+  100:
+    train_manifest: train.csv.gz
+    label_ratio: 1.0
+  10:
+    train_manifest: train_10.csv.gz
+    label_ratio: 0.1
+models:
+  anysat_base:
+    croma_input_norm: false
+    backbone:
+      name: anysat
+      repo_dir: ${ASSETS_ROOT}/third_party/AnySat-main
+      checkpoint: ${ASSETS_ROOT}/weights/AnySat/models/AnySat.pth
+      model_size: base
+      image_size: 96
+      patch_size_m: 80
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      doy: 182
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+  copernicusfm_base:
+    croma_input_norm: false
+    backbone:
+      name: copernicusfm
+      repo_dir: ${ASSETS_ROOT}/third_party/Copernicus-FM/Copernicus-FM
+      checkpoint: ${ASSETS_ROOT}/weights/Copernicus-FM/CopernicusFM_ViT_base_varlang_e100.pth
+      size: base
+      kernel_size: 8
+      input_norm: copernicus
+      token_norm: true
+      s1_wavelengths:
+      - 50000000
+      - 50000000
+      s1_bandwidths:
+      - 1000000000
+      - 1000000000
+      s2_wavelengths:
+      - 440
+      - 490
+      - 560
+      - 665
+      - 705
+      - 740
+      - 783
+      - 842
+      - 860
+      - 940
+      - 1610
+      - 2190
+      s2_bandwidths:
+      - 20
+      - 65
+      - 35
+      - 30
+      - 15
+      - 15
+      - 20
+      - 115
+      - 20
+      - 20
+      - 90
+      - 180
+  copernicusfm_large:
+    croma_input_norm: false
+    backbone:
+      name: copernicusfm
+      repo_dir: ${ASSETS_ROOT}/third_party/Copernicus-FM/Copernicus-FM
+      checkpoint: ${ASSETS_ROOT}/weights/Copernicus-FM/CopernicusFM_ViT_large_varlang_e100.pth
+      size: large
+      kernel_size: 8
+      input_norm: copernicus
+      token_norm: true
+      s1_wavelengths:
+      - 50000000
+      - 50000000
+      s1_bandwidths:
+      - 1000000000
+      - 1000000000
+      s2_wavelengths:
+      - 440
+      - 490
+      - 560
+      - 665
+      - 705
+      - 740
+      - 783
+      - 842
+      - 860
+      - 940
+      - 1610
+      - 2190
+      s2_bandwidths:
+      - 20
+      - 65
+      - 35
+      - 30
+      - 15
+      - 15
+      - 20
+      - 115
+      - 20
+      - 20
+      - 90
+      - 180
+  croma_base:
+    croma_input_norm: true
+    backbone:
+      name: croma
+      croma_dir: ${ASSETS_ROOT}/third_party/CROMA-main
+      checkpoint: ${ASSETS_ROOT}/weights/CROMA/CROMA_base.pt
+      size: base
+      image_resolution: 96
+  croma_large:
+    croma_input_norm: true
+    backbone:
+      name: croma
+      croma_dir: ${ASSETS_ROOT}/third_party/CROMA-main
+      checkpoint: ${ASSETS_ROOT}/weights/CROMA/CROMA_large.pt
+      size: large
+      image_resolution: 96
+  fomo_base:
+    croma_input_norm: false
+    backbone:
+      name: fomo
+      repo_dir: ${ASSETS_ROOT}/third_party/FoMo-Bench-main
+      checkpoint: ${ASSETS_ROOT}/weights/FoMo/fomo_single_embedding_layer_weights.pt
+      image_size: 64
+      target_image_size: 96
+      model_patch_size: 16
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+  galileo_base:
+    croma_input_norm: false
+    backbone:
+      name: galileo
+      repo_dir: ${ASSETS_ROOT}/third_party/galileo-main
+      weights_dir: ${ASSETS_ROOT}/weights/Galileo/models/base
+      image_size: 96
+      raw_patch_size: 8
+      input_norm: official
+      token_norm: true
+      month: 6
+      input_resolution_m: 10
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+  mars_base:
+    croma_input_norm: false
+    backbone:
+      name: mars
+      rgb_checkpoint: ${ASSETS_ROOT}/weights/MaRS/mars_base_rgb_encoder_only.pth
+      sar_checkpoint: ${ASSETS_ROOT}/weights/MaRS/mars_base_sar_encoder_only.pth
+      size: base
+      image_size: 256
+      target_side: 12
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      rgb_indices:
+      - 3
+      - 2
+      - 1
+      sar_reduce: mean
+      joint_mode: average
+  panopticon_vitb14:
+    croma_input_norm: false
+    backbone:
+      name: panopticon
+      repo_dir: ${ASSETS_ROOT}/third_party/panopticon-main
+      checkpoint: ${ASSETS_ROOT}/weights/Panopticon/panopticon_vitb14_teacher.pth
+      target_image_size: 168
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      joint_mode: multimodal
+      s1_channel_ids:
+      - -1
+      - -2
+      s2_channel_ids:
+      - 442.923
+      - 492.997
+      - 559.599
+      - 664.63
+      - 704.006
+      - 740.552
+      - 782.419
+      - 827.539
+      - 864.78
+      - 945.029
+      - 1613.862
+      - 2203.618
+  ramen_base:
+    croma_input_norm: false
+    backbone:
+      name: ramen
+      repo_dir: ${ASSETS_ROOT}/third_party/RAMEN-main
+      checkpoint: ${ASSETS_ROOT}/weights/RAMEN/ramen_base_99.ckpt
+      image_size: 96
+      input_res: 10.0
+      output_res: 80.0
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+  skysense_s1s2:
+    croma_input_norm: false
+    backbone:
+      name: skysense
+      sar_checkpoint: ${ASSETS_ROOT}/weights/SkySense/pretrain/skysense_model_backbone_s1.pth
+      optical_checkpoint: ${ASSETS_ROOT}/weights/SkySense/pretrain/skysense_model_backbone_s2.pth
+      target_image_size: 48
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+      joint_mode: average
+  skysenseplusplus_s1s2:
+    croma_input_norm: false
+    backbone:
+      name: skysense++
+      sar_checkpoint: ${ASSETS_ROOT}/weights/SkySensePlusPlus/pretrain/skysensepp_release_s1.pth
+      optical_checkpoint: ${ASSETS_ROOT}/weights/SkySensePlusPlus/pretrain/skysensepp_release_s2.pth
+      target_image_size: 48
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11
+      joint_mode: average
+      with_cls_token: false
+  softcon_vitb14:
+    croma_input_norm: false
+    backbone:
+      name: softcon
+      repo_dir: ${ASSETS_ROOT}/third_party/softcon-main
+      sar_checkpoint: ${ASSETS_ROOT}/weights/softcon/B2_vitb14_softcon_enc.pth
+      optical_checkpoint: ${ASSETS_ROOT}/weights/softcon/B13_vitb14_softcon_enc.pth
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      optical_channels: 13
+      joint_mode: average
+      image_size: 224
+      target_side: 12
+  terramind_base:
+    croma_input_norm: false
+    backbone:
+      name: terramind
+      repo_dir: ${ASSETS_ROOT}/third_party/terratorch-main
+      checkpoint: ${ASSETS_ROOT}/weights/TerraMind-1.0-base/TerraMind_v1_base.pt
+      size: base
+      image_size: 224
+      target_image_size: 192
+      model_patch_size: 16
+      raw_patch_size: 8
+      input_norm: terramind
+      token_norm: true
+      sar_modality: S1GRD
+      optical_modality: S2L2A
+      joint_mode: multimodal
+  terramind_large:
+    croma_input_norm: false
+    backbone:
+      name: terramind
+      repo_dir: ${ASSETS_ROOT}/third_party/terratorch-main
+      checkpoint: ${ASSETS_ROOT}/weights/TerraMind-1.0-large/TerraMind_v1_large.pt
+      size: large
+      image_size: 224
+      target_image_size: 192
+      model_patch_size: 16
+      raw_patch_size: 8
+      input_norm: terramind
+      token_norm: true
+      sar_modality: S1GRD
+      optical_modality: S2L2A
+      joint_mode: multimodal
+  terramind_small:
+    croma_input_norm: false
+    backbone:
+      name: terramind
+      repo_dir: ${ASSETS_ROOT}/third_party/terratorch-main
+      checkpoint: ${ASSETS_ROOT}/weights/TerraMind-1.0-small/TerraMind_v1_small.pt
+      size: small
+      image_size: 224
+      target_image_size: 192
+      model_patch_size: 16
+      raw_patch_size: 8
+      input_norm: terramind
+      token_norm: true
+      sar_modality: S1GRD
+      optical_modality: S2L2A
+      joint_mode: multimodal
+  terramind_tiny:
+    croma_input_norm: false
+    backbone:
+      name: terramind
+      repo_dir: ${ASSETS_ROOT}/third_party/terratorch-main
+      checkpoint: ${ASSETS_ROOT}/weights/TerraMind-1.0-tiny/TerraMind_v1_tiny.pt
+      size: tiny
+      image_size: 224
+      target_image_size: 192
+      model_patch_size: 16
+      raw_patch_size: 8
+      input_norm: terramind
+      token_norm: true
+      sar_modality: S1GRD
+      optical_modality: S2L2A
+      joint_mode: multimodal
+  tessera_v11_mpc:
+    croma_input_norm: false
+    backbone:
+      name: tessera
+      repo_dir: ${ASSETS_ROOT}/third_party/tessera-master
+      checkpoint: ${ASSETS_ROOT}/weights/tessera/tessera_v1_1_mpc_encoder.pt
+      image_size: 96
+      raw_patch_size: 8
+      input_norm: batch_robust
+      token_norm: true
+      doy: 182
+      s2_indices:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 10
+      - 11

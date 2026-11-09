@@ -1,0 +1,13 @@
+numpy
+torch>=2.6,<3
+pyyaml
+tifffile
+imagecodecs
+opencv-python-headless
+einops
+tqdm
+transformers>=4.56.0
+safetensors
+timm
+mamba-ssm>=2.2
+causal-conv1d>=1.4
