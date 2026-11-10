@@ -64,6 +64,13 @@ S1S2_LC8_Robust/
   val/{s1,s2,lc}/
   test/{s1,s2,lc}/
 ```
+Download the prepared S1S2-LC8 dataset from [Baidu Netdisk](https://pan.baidu.com/s/1sHuSP4NE0IOBJyyOGwaX_A?pwd=f3dw).
+
+- Extraction code: `f3dw`
+- Archive: `S1S2-LC8.zip` (18.82 GB)
+
+Extract the archive and set `--data-root` to the extracted
+`S1S2_LC8_Robust` directory.
 
 The files in `metadata/` contain the fixed sample paths, class histograms, image fingerprints, and training-image normalization statistics. The loader reads the compressed CSV files directly. Use the prepared benchmark files matching these manifests; original source archives require the benchmark's preprocessing and file naming.
 
