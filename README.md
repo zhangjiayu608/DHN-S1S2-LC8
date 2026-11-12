@@ -153,5 +153,3 @@ DHN-S1S2-LC8/
   dagpid/              # Data loading, models, losses, metrics, training loop
   metadata/            # Fixed splits, class mapping, statistics, checksums
 ```
-
-This code release covers the 100%/10% main encoder comparison. Prepared image data, pretrained assets, and generated outputs are supplied separately and excluded by `.gitignore`. Benchmark-construction scripts, adaptation-baseline experiments, SEN12TS experiments, ablation configurations, and paper-figure rendering are outside this package.
